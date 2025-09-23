@@ -1,5 +1,10 @@
 begin;
-    drop extension supa_audit;
+    -- disable logging to avoid cluttering the test output
+    \set ECHO none
+    set client_min_messages = warning;
+
+    -- begin before audit is created
+    drop schema if exists audit cascade;
 
     create schema auth;
 
@@ -13,9 +18,14 @@ begin;
         language sql
     as $$ select 'anon' $$;
 
-    create extension supa_audit;
+    -- load the audit migration
+    \i test/fixtures.sql
 
-    -- Check that the supabase auth_uid and auth_role columns are present
+    -- re-enable logging
+    set client_min_messages = notice;
+    \set ECHO all
+
+    -- Check that the auth_uid and auth_role columns are present
     select * from audit.record_version;
 
     create table public.xyz(id int primary key);

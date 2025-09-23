@@ -1,27 +1,31 @@
-# `supa_audit`
+# supi_audit
 
 <p>
-<a href=""><img src="https://img.shields.io/badge/postgresql-12+-blue.svg" alt="PostgreSQL version" height="18"></a>
-<a href="https://github.com/supabase/supa_audit/actions"><img src="https://github.com/supabase/supa_audit/actions/workflows/test.yaml/badge.svg" alt="Tests" height="18"></a>
+<a href=""><img src="https://img.shields.io/badge/postgresql-17+-blue.svg" alt="PostgreSQL version" height="18"></a>
+<a href="https://github.com/patte/supi_audit/actions"><img src="https://github.com/patte/supi_audit/actions/workflows/test.yaml/badge.svg" alt="Tests" height="18"></a>
 
 </p>
 
 ---
 
-**Source Code**: <a href="https://github.com/supabase/supa_audit" target="_blank">https://github.com/supabase/supa_audit</a>
+**Fork**: This is a fork of [supa_audit](https://github.com/supabase/supa_audit) with the following changes:
+  
+- [x] Simple migration instead of a postgres extension for easier "installation".
+- [x] Test setup with docker-compose instead of nix
+- [ ] Includes the transaction id in the audit log
 
 ---
 
-The `supa_audit` PostgreSQL extension is a generic solution for tracking changes to tables' data over time.
+The `supi_audit` PostgreSQL code is a generic solution for tracking changes to tables' data over time.
 
 The audit table, `audit.record_version`, leverages each records primary key values to produce a stable `record_id::uuid`, enabling efficient (linear time) history queries.
 
 
 ## Usage
 
-```sql
-create extension supa_audit cascade;
+Apply the content of [`supi_audit.sql`](supi_audit.sql) to your database.
 
+```sql
 create table public.account(
     id int primary key,
     name text not null
@@ -66,12 +70,18 @@ from
 select audit.disable_tracking('public.account'::regclass);
 ```
 
+## Auth
+
+If a function `auth.uid()` and `auth.role()` exists at the time of running the migration, the `audit.record_version` table will have the columns `auth_uid` and `auth_role` which will be populated with the result of calling these functions at the time of the data change.
+
+See [auth.sql test](test/sql/auth.sql).
+
 ## Test
 
 ### Run the Tests
 
 ```sh
-nix-shell --run "pg_13_supa_audit make installcheck"
+./scripts/run-sql-tests.sh
 ```
 
 ### Adding Tests
@@ -82,11 +92,6 @@ The output of the most recent test run is stored in `results/`.
 
 When the output for a test in `results/` is correct, copy it to `test/expected/` and the test will pass.
 
-## Interactive Prompt
-
-```sh
-nix-shell --run "pg_13_supa_audit psql"
-```
 
 ## Performance
 
