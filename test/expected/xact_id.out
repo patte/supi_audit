@@ -1,0 +1,52 @@
+-- Verify xact_id behavior across and within transactions
+-- Txn 1: create temp tables and enable tracking (commit so objects persist in session)
+begin;
+    create temp table t1(
+        id int primary key
+    );
+    create temp table t2(
+        id int primary key
+    );
+    select audit.enable_tracking('t1');
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    select audit.enable_tracking('t2');
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+commit;
+-- Txn 2: two inserts in the same transaction should share the same xact_id
+begin;
+    insert into t1(id) values (1);
+    insert into t2(id) values (1);
+    -- Expect: t (true)
+    select count(distinct xact_id) = 1 as same_xact_id_for_both
+    from audit.record_version
+    where op = 'INSERT' and table_name in ('t1','t2');
+ same_xact_id_for_both 
+-----------------------
+ t
+(1 row)
+
+    -- Capture current transaction id into a psql variable
+    select pg_current_xact_id()::text as first_xact_id \gset
+rollback;
+-- Txn 3: a new transaction should have a different xact_id
+begin;
+    insert into t1(id) values (2);
+    -- Compare the new audit row's xact_id with the previous txn's id; Expect: t (true)
+    select ((select xact_id from audit.record_version
+             where op = 'INSERT' and table_name = 't1'
+             order by id desc limit 1) <> (:'first_xact_id')::xid8)
+           as different_xact_id_than_before;
+ different_xact_id_than_before 
+-------------------------------
+ t
+(1 row)
+
+rollback;

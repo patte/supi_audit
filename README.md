@@ -12,7 +12,7 @@
   
 - [x] Simple migration instead of a postgres extension for easier "installation".
 - [x] Test setup with docker-compose instead of nix
-- [ ] Includes the transaction id in the audit log
+- [x] Include the transaction id (`xact_id`) in the audit record for correlation of changes
 
 ---
 
@@ -57,12 +57,12 @@ from
     audit.record_version;
 
 /*
- id |              record_id               |            old_record_id             |    op    |               ts                | table_oid | table_schema | table_name |                 record                 |             old_record
-----+--------------------------------------+--------------------------------------+----------+---------------------------------+-----------+--------------+------------+----------------------------------------+------------------------------------
-  1 | 57ca384e-f24c-5af5-b361-a057aeac506c |                                      | INSERT   | Thu Feb 10 17:02:25.621095 2022 |     16439 | public       | account    | {"id": 1, "name": "Foo Barsworth"}     |
-  2 | 57ca384e-f24c-5af5-b361-a057aeac506c | 57ca384e-f24c-5af5-b361-a057aeac506c | UPDATE   | Thu Feb 10 17:02:25.622151 2022 |     16439 | public       | account    | {"id": 1, "name": "Foo Barsworht III"} | {"id": 1, "name": "Foo Barsworth"}
-  3 |                                      | 57ca384e-f24c-5af5-b361-a057aeac506c | DELETE   | Thu Feb 10 17:02:25.622495 2022 |     16439 | public       | account    |                                        | {"id": 1, "name": "Foo Barsworth III"}
-  4 |                                      |                                      | TRUNCATE | Thu Feb 10 17:02:25.622779 2022 |     16439 | public       | account    |                                        |
+ id |              record_id               |            old_record_id             |    op    |              ts               | table_oid | table_schema | table_name | xact_id |                 record                 |               old_record               
+----+--------------------------------------+--------------------------------------+----------+-------------------------------+-----------+--------------+------------+---------+----------------------------------------+----------------------------------------
+  9 | 36c93923-0c5c-5fc2-879d-e4aa264b8f6e |                                      | INSERT   | 2025-09-23 21:44:19.437243+00 |     19544 | public       | account    |    1387 | {"id": 1, "name": "Foo Barsworth"}     | 
+ 10 | 36c93923-0c5c-5fc2-879d-e4aa264b8f6e | 36c93923-0c5c-5fc2-879d-e4aa264b8f6e | UPDATE   | 2025-09-23 21:44:19.44223+00  |     19544 | public       | account    |    1388 | {"id": 1, "name": "Foo Barsworht III"} | {"id": 1, "name": "Foo Barsworth"}
+ 11 |                                      | 36c93923-0c5c-5fc2-879d-e4aa264b8f6e | DELETE   | 2025-09-23 21:44:19.44503+00  |     19544 | public       | account    |    1389 |                                        | {"id": 1, "name": "Foo Barsworht III"}
+ 12 |                                      |                                      | TRUNCATE | 2025-09-23 21:44:19.44763+00  |     19544 | public       | account    |    1390 |                                        | 
 (4 rows)
 */
 

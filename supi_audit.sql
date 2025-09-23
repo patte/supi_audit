@@ -38,6 +38,9 @@ create table audit.record_version(
     table_schema   name not null,
     table_name     name not null,
 
+    -- transaction id
+    xact_id        xid8 not null default pg_current_xact_id(),
+
     -- contents of the record
     record         jsonb,
     -- previous record contents for UPDATE/DELETE
@@ -102,6 +105,10 @@ create index record_version_ts
 create index record_version_table_oid
     on audit.record_version(table_oid);
 
+
+create index record_version_xact_id
+    on audit.record_version(xact_id);
+    
 
 create or replace function audit.primary_key_columns(entity_oid oid)
     returns text[]

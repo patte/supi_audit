@@ -3,8 +3,8 @@ begin;
     \set ECHO none
     -- Check that the auth_uid and auth_role columns are present
     select * from audit.record_version;
- id | record_id | old_record_id | op | ts | table_oid | table_schema | table_name | record | old_record | auth_uid | auth_role 
-----+-----------+---------------+----+----+-----------+--------------+------------+--------+------------+----------+-----------
+ id | record_id | old_record_id | op | ts | table_oid | table_schema | table_name | xact_id | record | old_record | auth_uid | auth_role 
+----+-----------+---------------+----+----+-----------+--------------+------------+---------+--------+------------+----------+-----------
 (0 rows)
 
     create table public.xyz(id int primary key);
