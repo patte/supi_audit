@@ -74,6 +74,8 @@ select audit.disable_tracking('public.account'::regclass);
 
 If a function `auth.uid()` and `auth.role()` exists at the time of running the migration, the `audit.record_version` table will have the columns `auth_uid` and `auth_role` which will be populated with the result of calling these functions at the time of the data change.
 
+On supabase, these functions already exist. Outside of supabase, you can create them like demonstrated in [auth.sql](auth.sql).
+
 See [auth.sql test](test/sql/auth.sql).
 
 ## Test
