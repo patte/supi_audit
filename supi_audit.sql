@@ -6,7 +6,7 @@
     Forked from: github.com/supabase/supa_audit
 
     Date:
-        2025-09-33
+        2025-09-25
 
     Purpose:
         Generic audit history for tables including an indentifier
