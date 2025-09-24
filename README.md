@@ -10,9 +10,10 @@
 
 **Fork**: This is a fork of [supa_audit](https://github.com/supabase/supa_audit) with the following changes:
   
-- [x] Simple migration instead of a postgres extension for easier "installation".
-- [x] Test setup with docker-compose instead of nix
+- [x] Simple migration instead of a postgres extension for easier "installation"
 - [x] Include the transaction id (`xact_id`) in the audit record for correlation of changes
+- [x] Use single-column UUID PKs directly as `record_id` instead of deriving a v5 UUID from table oid + PK values.
+- [x] Test setup with docker-compose and scripts instead of nix
 
 ---
 

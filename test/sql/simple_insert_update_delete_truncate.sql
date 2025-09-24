@@ -29,7 +29,7 @@ begin;
             u.id asc
     )
     select
-        arv.id,
+        row_number() over (order by arv.id) as row_id,
         r.stable_id as remapped_record_id,
         ro.stable_id as remapped_old_record_id,
         op,
@@ -42,5 +42,7 @@ begin;
         left join remap r
             on arv.record_id = r.id
         left join remap ro
-            on arv.old_record_id = ro.id;
+            on arv.old_record_id = ro.id
+    order by
+        row_id;
 rollback;

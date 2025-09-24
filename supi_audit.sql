@@ -143,7 +143,16 @@ as $$
     select
         case
             when rec is null then null
+            
+            -- Heuristic: single-column PK that looks like a UUID -> use it directly
+            when array_length($2, 1) = 1
+            and ($3 ->> $2[1]) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+            then ($3 ->> $2[1])::uuid
+
+            -- empty PK (shouldn't happen for audited tables)
             when pkey_cols = array[]::text[] then uuid_generate_v4()
+
+            -- otherwise, derive a stable v5 UUID from table oid + PK values
             else (
                 select
                     uuid_generate_v5(
