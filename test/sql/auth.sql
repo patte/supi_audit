@@ -26,7 +26,7 @@ begin;
     \set ECHO all
 
     -- Check that the auth_uid and auth_role columns are present
-    select * from audit.record_version;
+    select id, auth_uid, auth_role from audit.record_version;
 
     create table public.xyz(id int primary key);
 
