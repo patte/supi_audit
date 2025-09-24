@@ -62,8 +62,8 @@ create table audit.record_version(
 
 do $$
     begin
-        -- Detect if we're in a supabase project
-        -- Ensure `auth.uid() -> uuid` and `auth.role() -> text` exist
+        -- If a function `auth.uid() -> uuid` and `auth.role() -> text` exists at the time of running this migration,
+        -- add the columns `auth_uid` and `auth_role` to `audit.record_version`
         if (
             select
                 count(distinct f.proname) = 2
