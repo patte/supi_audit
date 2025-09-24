@@ -1,0 +1,56 @@
+-- Scenario 1: auth functions exist & return NULL -> insert should ERROR (no bypass)
+begin;
+    \set ECHO none
+    select audit.enable_tracking('public.af_members1');
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    insert into public.af_members1 values('11111111-1111-1111-1111-111111111111', 'fail'); -- expect ERROR
+psql:test/sql/auth_force.sql:15: ERROR:  audit: auth.uid() must not be null (set local audit.ignore_auth = on to bypass)
+CONTEXT:  PL/pgSQL function audit.check_auth_context() line 15 at RAISE
+SQL statement "SELECT audit.check_auth_context()"
+PL/pgSQL function audit.insert_update_delete_trigger() line 11 at PERFORM
+rollback;
+-- Scenario 2: auth functions exist & return NULL but we bypass via audit.ignore_auth
+begin;
+    \set ECHO none
+    select audit.enable_tracking('public.af_members2');
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    set local audit.ignore_auth = on;
+    insert into public.af_members2 values('22222222-2222-2222-2222-222222222222', 'bypass'); -- succeeds due to bypass
+    select op, (record->>'name') as name, auth_uid, auth_role from audit.record_version;
+   op   |  name  | auth_uid | auth_role 
+--------+--------+----------+-----------
+ INSERT | bypass |          | anon
+(1 row)
+
+rollback;
+-- Scenario 3: No auth functions at migration time -> no auth columns -> no enforcement
+begin;
+    \set ECHO none
+    select audit.enable_tracking('public.af2');
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    insert into public.af2 values(1);
+    -- Show that no auth_* columns exist
+    select column_name from information_schema.columns where table_schema='audit' and table_name='record_version' and column_name like 'auth_%' order by 1;
+ column_name 
+-------------
+(0 rows)
+
+    select op, (record->>'id') as id from audit.record_version;
+   op   | id 
+--------+----
+ INSERT | 1
+(1 row)
+
+rollback;

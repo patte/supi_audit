@@ -82,7 +82,7 @@ do $$
             )
             then
 
-            alter table audit.record_version add column auth_uid  uuid default (auth.uid());
+            alter table audit.record_version add column auth_uid uuid default (auth.uid());
             alter table audit.record_version add column auth_role text default (auth.role());
         end if;
     end
@@ -168,6 +168,38 @@ as $$
 $$;
 
 
+-- Ensure that if record_version.auth_uid exists, auth.uid() returns non-null
+-- Can be bypassed by setting local audit.ignore_auth = on
+create or replace function audit.check_auth_context()
+    returns void
+    stable
+    security definer
+    set search_path = ''
+    language plpgsql
+as $$
+declare
+    has_auth boolean := exists (
+        select 1
+        from pg_attribute
+        where attrelid = 'audit.record_version'::regclass
+          and attname = 'auth_uid'
+          and not attisdropped
+    );
+    ignore_auth boolean := lower(coalesce(nullif(current_setting('audit.ignore_auth', true), ''), 'off')) in ('on','true','1');
+begin
+    if has_auth and not ignore_auth then
+        begin
+            if auth.uid() is null then
+                raise exception 'audit: auth.uid() must not be null (set local audit.ignore_auth = on to bypass)';
+            end if;
+        exception when undefined_function then
+            raise exception 'audit: auth.uid() function must exist (set local audit.ignore_auth = on to bypass)';
+        end;
+    end if;
+end;
+$$;
+
+
 create or replace function audit.insert_update_delete_trigger()
     returns trigger
     security definer
@@ -184,6 +216,7 @@ declare
     old_record_jsonb jsonb = to_jsonb(old);
     old_record_id uuid = audit.to_record_id(TG_RELID, pkey_cols, old_record_jsonb);
 begin
+    perform audit.check_auth_context();
 
     insert into audit.record_version(
         record_id,
@@ -217,6 +250,8 @@ create or replace function audit.truncate_trigger()
     language plpgsql
 as $$
 begin
+    perform audit.check_auth_context();
+
     insert into audit.record_version(
         op,
         table_oid,
