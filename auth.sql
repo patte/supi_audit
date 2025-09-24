@@ -1,12 +1,20 @@
 create schema if not exists auth;
 
--- Returns the current user's UUID from a transaction-local GUC
+-- Returns the current user's UUID from a transaction-local GUC app.user_id
+-- raises with a custom message if not set
 create or replace function auth.uid()
-returns uuid
-stable
-language sql
+  returns uuid
+  stable
+  language plpgsql
 as $$
-  select nullif(current_setting('app.user_id', true), '')::uuid
+declare
+  _uid uuid := nullif(current_setting('auth.user_id', true), '')::uuid;
+begin
+  if _uid is null then
+    raise exception 'auth.uid(): current_setting(''auth.user_id'') must not be empty. Call auth.set_context(user_id, role) to set it.';
+  end if;
+  return _uid;
+end;
 $$;
 
 -- Returns the current user's role (arbitrary text) from a transaction-local GUC
@@ -15,7 +23,7 @@ returns text
 stable
 language sql
 as $$
-  select nullif(current_setting('app.role', true), '')
+  select nullif(current_setting('auth.role', true), '')
 $$;
 
 -- Sets the current user's UUID and role in transaction-local GUCs
@@ -25,7 +33,7 @@ create or replace procedure auth.set_context(p_uid uuid, p_role text)
 language plpgsql
 as $$
 begin
-  perform set_config('app.user_id', coalesce(p_uid::text, ''), true);
-  perform set_config('app.role',    coalesce(p_role, ''),      true);
+  perform set_config('auth.user_id', coalesce(p_uid::text, ''), true);
+  perform set_config('auth.role',    coalesce(p_role, ''),      true);
 end;
 $$;

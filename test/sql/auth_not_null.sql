@@ -1,4 +1,8 @@
--- Scenario 1: auth functions exist & return NULL -> insert should ERROR (no bypass)
+-- avoid ts, xact_id differences in output
+\set VERBOSITY terse
+\set SHOW_CONTEXT never
+
+-- Scenario 1: auth functions exist & return NULL -> insert should ERROR
 begin;
     \set ECHO none
     set client_min_messages = warning;
@@ -15,22 +19,19 @@ begin;
     insert into public.af_members1 values('11111111-1111-1111-1111-111111111111', 'fail'); -- expect ERROR
 rollback;
 
--- Scenario 2: auth functions exist & return NULL but we bypass via audit.ignore_auth
+-- Scenario 2: auth functions exist (from auth.sql), no GUCs set -> insert should ERROR with custom message
 begin;
     \set ECHO none
     set client_min_messages = warning;
     drop schema if exists audit cascade;
     drop schema if exists auth cascade;
     create schema auth;
-    create function auth.uid() returns uuid language sql as $$ select null::uuid $$; -- returns null intentionally
-    create function auth.role() returns text language sql as $$ select 'anon' $$;
+    \i auth.sql
     \i test/fixtures.sql
     create table public.af_members2(id uuid primary key, name text);
     set client_min_messages = notice; \set ECHO all
     select audit.enable_tracking('public.af_members2');
-    set local audit.ignore_auth = on;
-    insert into public.af_members2 values('22222222-2222-2222-2222-222222222222', 'bypass'); -- succeeds due to bypass
-    select op, (record->>'name') as name, auth_uid, auth_role from audit.record_version;
+    insert into public.af_members2 values('22222222-2222-2222-2222-222222222222', 'fail'); -- expect error
 rollback;
 
 -- Scenario 3: No auth functions at migration time -> no auth columns -> no enforcement
@@ -48,3 +49,6 @@ begin;
     select column_name from information_schema.columns where table_schema='audit' and table_name='record_version' and column_name like 'auth_%' order by 1;
     select op, (record->>'id') as id from audit.record_version;
 rollback;
+
+\set VERBOSITY default
+\set SHOW_CONTEXT errors

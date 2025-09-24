@@ -13,7 +13,7 @@
 - [x] Simple migration instead of a postgres extension for easier "installation"
 - [x] Include the transaction id (`xact_id`) in the audit record for correlation of changes
 - [x] Use single-column UUID PKs directly as `record_id` instead of deriving a v5 UUID from table oid + PK values.
-- [x] Requires `auth.uid()` to return non-null if `auth_uid` column exists, unless bypassed by setting `local audit.ignore_auth = on`
+- [x] Strict auth: If `auth.uid()` exists at migration time, the added `auth_uid` column is `not null` and thus requires `auth.uid()` to return a uuid.
 - [x] Test setup with docker-compose and scripts instead of nix
 
 ---
@@ -76,10 +76,9 @@ select audit.disable_tracking('public.account'::regclass);
 
 If a function `auth.uid()` and `auth.role()` exists at the time of running the migration, the `audit.record_version` table will have the columns `auth_uid` and `auth_role` which will be populated with the result of calling these functions at the time of the data change.
 
-On supabase, these functions already exist. Outside of supabase, you can create them like demonstrated in [auth.sql](auth.sql).
-See the test [auth.sql](test/sql/auth.sql).
+On supabase, these functions already exist. Outside of supabase, you can create them like demonstrated in [auth.sql](auth.sql). `auth.uid()` contains a custom error message if the user id is not set.
 
-If `auth.uid()` returns `NULL` and the `auth_uid` column exists, the data change will be rejected unless you set `local audit.ignore_auth = on` in the current session or transaction. This ensures that no changes can be made without an associated user id, unless explicitly bypassed.
+See the test [auth.sql](test/sql/auth.sql).
 
 ## Test
 
