@@ -1,7 +1,9 @@
 -- SPDX-License-Identifier: Apache-2.0
 /*
-    Generic Audit Trigger
-    Linear Time Record Version History
+    supi_audit.sql
+    ----------------
+    Repo: github.com/patte/supi_audit
+    Forked from: github.com/supabase/supa_audit
 
     Date:
         2025-09-33
