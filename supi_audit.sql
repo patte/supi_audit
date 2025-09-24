@@ -108,7 +108,7 @@ create index record_version_table_oid
 
 create index record_version_xact_id
     on audit.record_version(xact_id);
-    
+
 
 create or replace function audit.primary_key_columns(entity_oid oid)
     returns text[]
