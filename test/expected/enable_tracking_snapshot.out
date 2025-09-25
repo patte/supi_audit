@@ -1,0 +1,118 @@
+begin;
+    create table public.snaptest(
+        id int primary key,
+        name text not null
+    );
+    insert into public.snaptest(id, name) values (1, 'a'), (2, 'b');
+    -- Enable with snapshot
+    select audit.enable_tracking('public.snaptest', true);
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    -- Collect audit rows
+    select
+        id,
+        op,
+        table_schema,
+        table_name,
+        record,
+        old_record
+    from
+        audit.record_version;
+ id |    op    | table_schema | table_name |         record         | old_record 
+----+----------+--------------+------------+------------------------+------------
+  2 | SNAPSHOT | public       | snaptest   | {"id": 1, "name": "a"} | 
+  3 | SNAPSHOT | public       | snaptest   | {"id": 2, "name": "b"} | 
+(2 rows)
+
+    -- Change one row after snapshot
+    update public.snaptest set name = 'b2' where id = 2;
+    -- Disable and re-enable without snapshot (should NOT create more snapshot rows)
+    select audit.disable_tracking('public.snaptest');
+ disable_tracking 
+------------------
+ 
+(1 row)
+
+    select audit.enable_tracking('public.snaptest');
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    -- Insert another row
+    insert into public.snaptest(id, name) values (3, 'c');
+    -- Disable and re-enable with snapshot (should create snapshot rows for current state)
+    select audit.disable_tracking('public.snaptest');
+ disable_tracking 
+------------------
+ 
+(1 row)
+
+    select audit.enable_tracking('public.snaptest', true);
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    -- Collect audit rows
+     select
+        id,
+        op,
+        table_schema,
+        table_name,
+        record,
+        old_record
+    from
+        audit.record_version;
+ id |    op    | table_schema | table_name |         record          |       old_record       
+----+----------+--------------+------------+-------------------------+------------------------
+  2 | SNAPSHOT | public       | snaptest   | {"id": 1, "name": "a"}  | 
+  3 | SNAPSHOT | public       | snaptest   | {"id": 2, "name": "b"}  | 
+  4 | UPDATE   | public       | snaptest   | {"id": 2, "name": "b2"} | {"id": 2, "name": "b"}
+  5 | INSERT   | public       | snaptest   | {"id": 3, "name": "c"}  | 
+  6 | SNAPSHOT | public       | snaptest   | {"id": 1, "name": "a"}  | 
+  7 | SNAPSHOT | public       | snaptest   | {"id": 2, "name": "b2"} | 
+  8 | SNAPSHOT | public       | snaptest   | {"id": 3, "name": "c"}  | 
+(7 rows)
+
+    -- test complicated table
+    create table public.snaptest2(
+        id uuid primary key,
+        a text not null,
+        b int,
+        c timestamp with time zone,
+        d bytea
+    );
+    insert into public.snaptest2(id, a, b, c, d) values
+        ('00000000-0000-0000-0000-000000000001', 'x', 1, '2025-01-01T00:00:00Z', decode('DEADBEEF', 'hex'));
+    -- take snapshot
+    select audit.enable_tracking('public.snaptest2', true);
+ enable_tracking 
+-----------------
+ 
+(1 row)
+
+    -- no-op update
+    update public.snaptest2 set a = a where id = '00000000-0000-0000-0000-000000000001';
+    select
+        id,
+        op,
+        table_schema,
+        table_name,
+        record,
+        old_record
+    from
+        audit.record_version
+    where
+        table_name = 'snaptest2'
+    order by id;
+ id |    op    | table_schema | table_name |                                                         record                                                         |                                                       old_record                                                       
+----+----------+--------------+------------+------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------
+  9 | SNAPSHOT | public       | snaptest2  | {"a": "x", "b": 1, "c": "2025-01-01T00:00:00+00:00", "d": "\\xdeadbeef", "id": "00000000-0000-0000-0000-000000000001"} | 
+ 10 | UPDATE   | public       | snaptest2  | {"a": "x", "b": 1, "c": "2025-01-01T00:00:00+00:00", "d": "\\xdeadbeef", "id": "00000000-0000-0000-0000-000000000001"} | {"a": "x", "b": 1, "c": "2025-01-01T00:00:00+00:00", "d": "\\xdeadbeef", "id": "00000000-0000-0000-0000-000000000001"}
+(2 rows)
+
+rollback;

@@ -8,5 +8,5 @@ begin;
     -- Should raise exception that there is no primary key
     select audit.enable_tracking('public.dummy');
 psql:test/sql/require_primary_key.sql:12: ERROR:  Table public.dummy can not be audited because it has no primary key
-CONTEXT:  PL/pgSQL function audit.enable_tracking(regclass) line 24 at RAISE
+CONTEXT:  PL/pgSQL function audit.enable_tracking(regclass,boolean) line 27 at RAISE
 rollback;

@@ -22,7 +22,8 @@ create type audit.operation as enum (
     'INSERT',
     'UPDATE',
     'DELETE',
-    'TRUNCATE'
+    'TRUNCATE',
+    'SNAPSHOT'
 );
 
 
@@ -51,9 +52,9 @@ create table audit.record_version(
     -- at least one of record_id or old_record_id is populated, except for truncates
     check (coalesce(record_id, old_record_id) is not null or op = 'TRUNCATE'),
 
-    -- record_id must be populated for insert and update
-    check (op in ('INSERT', 'UPDATE') = (record_id is not null)),
-    check (op in ('INSERT', 'UPDATE') = (record is not null)),
+    -- record_id must be populated for insert, update, and snapshot
+    check (op in ('INSERT', 'UPDATE', 'SNAPSHOT') = (record_id is not null)),
+    check (op in ('INSERT', 'UPDATE', 'SNAPSHOT') = (record is not null)),
 
     -- old_record must be populated for update and delete
     check (op in ('UPDATE', 'DELETE') = (old_record_id is not null)),
@@ -235,7 +236,69 @@ end;
 $$;
 
 
-create or replace function audit.enable_tracking(regclass)
+create or replace function audit._take_snapshot(entity_oid oid)
+    returns void
+    volatile
+    security definer
+    set search_path = ''
+    language plpgsql
+as $$
+declare
+    pkey_cols text[] = audit.primary_key_columns(entity_oid);
+    table_schema text;
+    table_name text;
+    snapshot_sql text;
+    order_cols text;
+begin
+    if pkey_cols = array[]::text[] then
+        raise exception 'Table % can not be snapshotted because it has no primary key', entity_oid;
+    end if;
+
+    select n.nspname, c.relname into table_schema, table_name
+    from pg_class c
+    join pg_namespace n on c.relnamespace = n.oid
+    where c.oid = entity_oid;
+
+    -- Ensure standard schemas available for uuid-ossp functions
+    perform set_config('search_path', 'pg_catalog,public', true);
+
+    -- Build dynamic SQL. We need a regclass literal; use '%I.%I' inside quotes.
+    -- Build ORDER BY clause over primary key columns for deterministic insertion order
+    select string_agg(format('%I', col), ', ') into order_cols
+    from unnest(pkey_cols) col;
+
+    snapshot_sql := format($fmt$
+        insert into audit.record_version(
+            record_id,
+            op,
+            table_oid,
+            table_schema,
+            table_name,
+            record
+        )
+        select
+            audit.to_record_id('%1$I.%2$I'::regclass::oid, %3$L::text[], to_jsonb(t)),
+            'SNAPSHOT'::audit.operation,
+            '%1$I.%2$I'::regclass::oid,
+            %4$L,
+            %5$L,
+            to_jsonb(t)
+        from %1$I.%2$I t
+        %6$s;
+    $fmt$,
+        table_schema,
+        table_name,
+        pkey_cols,
+        table_schema,
+        table_name,
+        case when order_cols is null then '' else 'order by ' || order_cols end
+    );
+    execute snapshot_sql;
+end;
+$$;
+
+
+create or replace function audit.enable_tracking(regclass, take_snapshot boolean default false)
     returns void
     volatile
     security definer
@@ -262,6 +325,9 @@ declare
     );
 
     pkey_cols text[] = audit.primary_key_columns($1);
+
+    created_row_trigger boolean = false;
+    created_stmt_trigger boolean = false;
 begin
     if pkey_cols = array[]::text[] then
         raise exception 'Table % can not be audited because it has no primary key', $1;
@@ -269,10 +335,16 @@ begin
 
     if not exists(select 1 from pg_trigger where tgrelid = $1 and tgname = 'audit_i_u_d') then
         execute statement_row;
+        created_row_trigger = true;
     end if;
 
     if not exists(select 1 from pg_trigger where tgrelid = $1 and tgname = 'audit_t') then
         execute statement_stmt;
+        created_stmt_trigger = true;
+    end if;
+
+    if take_snapshot and (created_row_trigger or created_stmt_trigger) then
+        perform audit._take_snapshot($1);
     end if;
 end;
 $$;

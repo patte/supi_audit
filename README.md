@@ -14,6 +14,7 @@
 - [x] Include the transaction id (`xact_id`) in the audit record for correlation of changes
 - [x] Use single-column UUID PKs directly as `record_id` instead of deriving a v5 UUID from table oid + PK values.
 - [x] Strict auth: If `auth.uid()` exists at migration time, the added `auth_uid` column is `not null` and thus requires `auth.uid()` to return a uuid.
+- [x] Initial `SNAPSHOT`: `enable_tracking` has an optional second argument `take_snapshot` (default `false`) which, if set to `true`, will insert the current contents of the table into `audit.record_version` as `SNAPSHOT` rows. 
 - [x] Test setup with docker-compose and scripts instead of nix
 
 ---
@@ -34,7 +35,7 @@ create table public.account(
 );
 
 -- Enable auditing
-select audit.enable_tracking('public.account'::regclass);
+select audit.enable_tracking('public.account'::regclass); -- no initial snapshot
 
 -- Insert a record
 insert into public.account(id, name)
@@ -79,6 +80,20 @@ If a function `auth.uid()` and `auth.role()` exists at the time of running the m
 On supabase, these functions already exist. Outside of supabase, you can create them like demonstrated in [auth.sql](auth.sql). `auth.uid()` contains a custom error message if the user id is not set.
 
 See the test [auth.sql](test/sql/auth.sql).
+
+### Snapshot rows
+
+When calling `audit.enable_tracking(table, true)` the current contents of the table are inserted into `audit.record_version` with the operation `SNAPSHOT`. These rows act as a baseline so that a table that already contains data has a starting point in the audit history.
+
+Snapshots are optional and disabled by default (`take_snapshot` defaults to `false`) to keep `enable_tracking` fast for large tables. You can always capture a snapshot manually later by temporarily disabling and re‑enabling tracking with `take_snapshot => true`.
+
+```sql
+-- Enable auditing and capture a snapshot of existing rows
+select audit.enable_tracking('public.account'::regclass, true);
+
+-- Enable auditing without snapshot (default)
+select audit.enable_tracking('public.account'::regclass);
+```
 
 ## Test
 
