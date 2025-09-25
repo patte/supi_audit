@@ -87,6 +87,10 @@ do $$
             alter table audit.record_version add column auth_uid uuid not null;
             alter table audit.record_version alter column auth_uid set default (auth.uid());
             alter table audit.record_version add column auth_role text default (auth.role());
+
+            -- indices
+            create index record_version_auth_uid on audit.record_version(auth_uid);
+            create index record_version_auth_role on audit.record_version(auth_role);
         end if;
     end
 $$;
