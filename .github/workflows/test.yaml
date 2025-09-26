@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        postgres-version: ["17"]
+        postgres-version: ["17", "18"]
 
     services:
       postgres:
@@ -27,13 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install PostgreSQL client v17
+      # Install PostgreSQL client v18
       - name: Install PostgreSQL client
         run: |
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
           sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          sudo apt-get install -y postgresql-client-18
 
       - name: Run SQL tests
         env:
